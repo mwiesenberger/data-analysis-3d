@@ -1,0 +1,8 @@
+*.json
+*.png
+*.xml
+*.gif
+*.mp4
+*.tex
+.ipynb_checkpoints
+__pycache__/
