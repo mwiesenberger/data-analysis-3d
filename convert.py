@@ -1,15 +1,17 @@
 import numpy as np
 import json
 from bs4 import BeautifulSoup
+from xml.etree.ElementTree import Element,tostring
+from xml.dom import minidom
 import matplotlib.colors as mcolors
 
-def xml2cmap( file, name='custom-colormap') :
+def xml2cmap( filename, name='custom-colormap') :
     """Converts a paraview compatible colormap xml file to a matplotlib colormap
 
     https://www.paraview.org/Wiki/Colormaps
     Parameters
     ----------
-    file: file-like
+    filename: string
         xml file containing colormap
     name: str
         name to give to the colormap.
@@ -17,7 +19,7 @@ def xml2cmap( file, name='custom-colormap') :
     -------
     cmap : matplotlib.colors.LinearSegmentedColormap
     """
-    soup = BeautifulSoup(open(file), 'xml')
+    soup = BeautifulSoup(open(filename), 'xml')
     unified = []
     for s in soup.find_all('Point'):
         position  = float(s['x'])
@@ -33,14 +35,48 @@ def xml2cmap( file, name='custom-colormap') :
 
     return mcolors.LinearSegmentedColormap.from_list( name, unified)
 
-def cmap2json(  cmap, file):
+def cmap2xml( cmap, filename = "colormap.xml") :
+    """Converts a matplotlib colormap to paraview compatible xml
+
+    Note: xml2cmap followed by cmap2xml is **not** the identity
+    https://www.paraview.org/Wiki/Colormaps
+    Parameters
+    ----------
+    filename: string
+        name of xml file containing colormap
+    Returns
+    -------
+    None
+    """
+    # https://www.geeksforgeeks.org/turning-a-dictionary-into-xml-in-python/
+    elem = Element("ColorMaps")
+    child = Element( "ColorMap")
+    child.set( "space", "Lab")
+    child.set( "indexedLookup", "false")
+    child.set( "group", "Interlinked")
+    child.set( "name", cmap.name)
+    elem.append( child)
+    gradient= np.linspace( 0,1,512)
+    for g in gradient:
+        rgb = mcolors.to_rgb( cmap(g))
+        point = Element("Point")
+        point.set( "x", f"{g:.16f}")
+        point.set( "r", f"{rgb[0]:.16f}")
+        point.set( "g", f"{rgb[1]:.16f}")
+        point.set( "b", f"{rgb[2]:.16f}")
+        child.append(point)
+    with open( filename, "w") as f:
+        f.write( minidom.parseString( tostring(elem)).toprettyxml(indent="    "))
+
+
+def cmap2json(  cmap, filename):
     """ Create a json file that can be imported into paraview
 
     Format inferred from paraview's export function
     Parameters
     ----------
     cmap : matplotlib.colors.Colormap
-    file: file-like
+    filename: string
         json file name where the colormap is written
 
     """
@@ -55,5 +91,5 @@ def cmap2json(  cmap, file):
            "Name" : cmap.name,
            "RGBPoints" : list( sum(xrgb_list,())) # flatten list
           }]
-    with open( file, "w") as f:
+    with open( filename, "w") as f:
         json.dump(pc, f, indent=4 )
